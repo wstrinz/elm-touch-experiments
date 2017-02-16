@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes
+import Html.Events exposing (on)
 import Svg
 import Svg.Attributes as SA
 
@@ -11,6 +12,8 @@ import Svg.Attributes as SA
 import MultiTouch as MT
 import SingleTouch as ST
 import Touch as T
+import Mouse exposing (Position)
+import Json.Decode as Decoder
 
 
 type alias Location =
@@ -18,23 +21,30 @@ type alias Location =
 
 
 type alias Model =
-    { currStEvent : String
-    , currMultiTouchEvent : String
+    { currStEvent : Maybe String
+    , currMultiTouchEvent : Maybe String
     , circle : Maybe Location
+    , mousePos : Maybe Position
+    , mouseDown : Bool
     }
 
 
 model : Model
 model =
-    { currStEvent = "nothin"
-    , currMultiTouchEvent = "nothing yet"
+    { currStEvent = Nothing
+    , currMultiTouchEvent = Nothing
     , circle = Nothing
+    , mousePos = Nothing
+    , mouseDown = False
     }
 
 
 type Msg
     = TouchMsg T.TouchEvent T.Touch
     | MultiTouchMsg T.TouchEvent MT.MultiTouch
+    | DragStart Position
+    | DragAt Position
+    | DragEnd Position
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -56,14 +66,46 @@ update msg model =
                         T.TouchCancel ->
                             Nothing
             in
-                ( { model | currStEvent = (toString event) ++ (toString touch), circle = circle }
+                ( { model | currStEvent = Just <| (toString event) ++ (toString touch), circle = circle }
                 , Cmd.none
                 )
 
         MultiTouchMsg event touch ->
-            ( { model | currMultiTouchEvent = (toString event) ++ (toString touch) }
+            ( { model | currMultiTouchEvent = Just <| (toString event) ++ (toString touch) }
             , Cmd.none
             )
+
+        DragStart position ->
+            let
+                circle =
+                    Just <| ( toFloat position.x, toFloat position.y )
+            in
+                ( { model | circle = circle, mouseDown = True }
+                , Cmd.none
+                )
+
+        DragEnd position ->
+            let
+                circle =
+                    Just <| ( toFloat position.x, toFloat position.y )
+            in
+                ( { model | circle = circle, mouseDown = False }
+                , Cmd.none
+                )
+
+        DragAt position ->
+            let
+                circle =
+                    case model.mouseDown of
+                        True ->
+                            Just <| ( toFloat position.x, toFloat position.y )
+
+                        False ->
+                            Nothing
+            in
+                ( { model | circle = circle }
+                , Cmd.none
+                )
 
 
 touchDivStyle : String -> Html.Attribute Msg
@@ -88,7 +130,7 @@ singleTouchDiv : Model -> Html Msg
 singleTouchDiv model =
     let
         base =
-            Svg.svg <| singleTouchAttrs ++ [ touchDivStyle "black" ]
+            Svg.svg <| singleTouchAttrs ++ [ touchDivStyle "black", onMouseDown ]
     in
         case model.circle of
             Nothing ->
@@ -119,6 +161,16 @@ main =
     Html.program
         { view = view
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         , init = ( model, Cmd.none )
         }
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.batch [ Mouse.moves DragAt, Mouse.ups DragEnd ]
+
+
+onMouseDown : Html.Attribute Msg
+onMouseDown =
+    on "mousedown" (Decoder.map DragStart Mouse.position)
