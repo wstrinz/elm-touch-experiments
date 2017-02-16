@@ -1,77 +1,79 @@
-module Counter exposing (main)
+module Main exposing (main)
 
-import Html exposing (Html, div, text, button)
-import Html.Events exposing (onClick)
+import Html exposing (Html, button, div, text)
 import Html.Attributes
-import Touch as T
+
+
+-- import Html.Events exposing (onClick)
+
+import MultiTouch as MT
 import SingleTouch as ST
+import Touch as T
 
 
 type alias Model =
-    { counter : Int
-    , currStEvent : String
+    { currStEvent : String
+    , currMultiTouchEvent : String
     }
 
 
 model : Model
 model =
-    { counter = 1
-    , currStEvent = "nothin"
+    { currStEvent = "nothin"
+    , currMultiTouchEvent = "nothing yet"
     }
 
 
 type Msg
-    = Increment
-    | Decrement
-    | TouchMsg T.TouchEvent T.Touch
+    = TouchMsg T.TouchEvent T.Touch
+    | MultiTouchMsg T.TouchEvent MT.MultiTouch
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Increment ->
-            ( { model | counter = model.counter + 1 }
-            , Cmd.none
-            )
-
-        Decrement ->
-            ( { model | counter = model.counter - 1 }
-            , Cmd.none
-            )
-
         TouchMsg event touch ->
             ( { model | currStEvent = (toString event) ++ (toString touch) }
             , Cmd.none
             )
 
-
-singleTouchDivStyle : Html.Attribute Msg
-singleTouchDivStyle =
-    Html.Attributes.style [ ( "border", "2px solid black" ), ( "padding", "15px" ) ]
-
-
-stToM : ST.SingleTouch -> Msg
-stToM st =
-    TouchMsg st.touchType st.touch
+        MultiTouchMsg event touch ->
+            ( { model | currMultiTouchEvent = (toString event) ++ (toString touch) }
+            , Cmd.none
+            )
 
 
-touchAttrs : Html.Attribute Msg
-touchAttrs =
-    ST.onSingleTouch T.TouchStart T.preventAndStop <| stToM
+touchDivStyle : String -> Html.Attribute Msg
+touchDivStyle borderColor =
+    Html.Attributes.style [ ( "border", "2px solid " ++ borderColor ), ( "padding", "150px" ) ]
+
+
+singleTouchAttrs : Html.Attribute Msg
+singleTouchAttrs =
+    ST.onSingleTouch T.TouchStart T.preventAndStop <| (\st -> TouchMsg st.touchType st.touch)
+
+
+multiTouchAttrs : Html.Attribute Msg
+multiTouchAttrs =
+    MT.onMultiTouch T.TouchStart T.preventAndStop <| MultiTouchMsg T.TouchStart
 
 
 singleTouchDiv : Model -> Html Msg
 singleTouchDiv model =
-    div [ touchAttrs, singleTouchDivStyle ] [ text "single touch tester" ]
+    div [ singleTouchAttrs, touchDivStyle "black" ] [ text "single touch tester" ]
+
+
+multiTouchDiv : Model -> Html Msg
+multiTouchDiv model =
+    div [ multiTouchAttrs, touchDivStyle "red" ] [ text "multi touch tester" ]
 
 
 view : Model -> Html Msg
 view model =
     div []
-        [ div [] [ button [ onClick Increment ] [ text "+" ] ]
-        , div [] [ text <| toString model ]
-        , div [] [ button [ onClick Decrement ] [ text "-" ] ]
+        [ div [] [ text <| toString model ]
         , singleTouchDiv model
+        , multiTouchDiv model
         ]
 
 
