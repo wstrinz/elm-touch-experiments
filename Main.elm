@@ -49,61 +49,51 @@ type Msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        TouchMsg event touch ->
-            let
-                circle =
-                    case event of
-                        T.TouchStart ->
-                            Just <| ( touch.clientX, touch.clientY )
+    let
+        circleForPos position =
+            Just <| ( toFloat position.x, toFloat position.y )
+    in
+        case msg of
+            TouchMsg event touch ->
+                let
+                    tPos =
+                        Just <| ( touch.clientX, touch.clientY )
 
-                        T.TouchMove ->
-                            Just <| ( touch.clientX, touch.clientY )
+                    circle =
+                        case event of
+                            T.TouchStart ->
+                                tPos
 
-                        T.TouchEnd ->
-                            Nothing
+                            T.TouchMove ->
+                                tPos
 
-                        T.TouchCancel ->
-                            Nothing
-            in
-                ( { model | currStEvent = Just <| (toString event) ++ (toString touch), circle = circle }
+                            T.TouchEnd ->
+                                Nothing
+
+                            T.TouchCancel ->
+                                Nothing
+                in
+                    ( { model | currStEvent = Just <| (toString event) ++ (toString touch), circle = circle }
+                    , Cmd.none
+                    )
+
+            MultiTouchMsg event touch ->
+                ( { model | currMultiTouchEvent = Just <| (toString event) ++ (toString touch) }
                 , Cmd.none
                 )
 
-        MultiTouchMsg event touch ->
-            ( { model | currMultiTouchEvent = Just <| (toString event) ++ (toString touch) }
-            , Cmd.none
-            )
-
-        DragStart position ->
-            let
-                circle =
-                    Just <| ( toFloat position.x, toFloat position.y )
-            in
-                ( { model | circle = circle, mouseDown = True }
+            DragStart position ->
+                ( { model | circle = circleForPos position, mouseDown = True }
                 , Cmd.none
                 )
 
-        DragEnd position ->
-            let
-                circle =
-                    Just <| ( toFloat position.x, toFloat position.y )
-            in
-                ( { model | circle = circle, mouseDown = False }
+            DragEnd position ->
+                ( { model | circle = circleForPos position, mouseDown = False }
                 , Cmd.none
                 )
 
-        DragAt position ->
-            let
-                circle =
-                    case model.mouseDown of
-                        True ->
-                            Just <| ( toFloat position.x, toFloat position.y )
-
-                        False ->
-                            Nothing
-            in
-                ( { model | circle = circle }
+            DragAt position ->
+                ( { model | circle = circleForPos position }
                 , Cmd.none
                 )
 
@@ -115,10 +105,12 @@ touchDivStyle borderColor =
 
 singleTouchAttrs : List (Html.Attribute Msg)
 singleTouchAttrs =
-    [ ST.onSingleTouch T.TouchStart T.preventAndStop <| (\st -> TouchMsg st.touchType st.touch)
-    , ST.onSingleTouch T.TouchMove T.preventAndStop <| (\st -> TouchMsg st.touchType st.touch)
-    , ST.onSingleTouch T.TouchEnd T.preventAndStop <| (\st -> TouchMsg st.touchType st.touch)
-    ]
+    let
+        touchInstruction touchType =
+            ST.onSingleTouch touchType T.preventAndStop <| (\st -> TouchMsg st.touchType st.touch)
+    in
+        List.map touchInstruction
+            [ T.TouchStart, T.TouchMove, T.TouchEnd ]
 
 
 multiTouchAttrs : Html.Attribute Msg
